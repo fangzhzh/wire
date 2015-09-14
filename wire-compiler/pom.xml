@@ -9,7 +9,7 @@
     <version>2.0.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>wire-compiler</artifactId>
+  <artifactId>garena-wire-compiler</artifactId>
 
   <dependencies>
     <dependency>

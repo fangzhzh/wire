@@ -32,6 +32,7 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.WildcardTypeName;
+import com.squareup.wire.*;
 import com.squareup.wire.Extension;
 import com.squareup.wire.Message;
 import com.squareup.wire.ProtoAdapter;
@@ -91,6 +92,14 @@ public final class JavaGenerator {
   static final ClassName PARCELABLE = ClassName.get("android.os", "Parcelable");
   static final ClassName CREATOR = PARCELABLE.nestedClass("Creator");
 
+  private static final ImmutableSet<String> JAVA_KEYWORDS = ImmutableSet.of("abstract", "assert",
+          "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue",
+          "default", "do", "double", "else", "enum", "extends", "final", "finally", "float", "for",
+          "goto", "if", "implements", "import", "instanceof", "int", "interface", "long", "native",
+          "new", "package", "private", "protected", "public", "return", "short", "static",
+          "strictfp", "super", "switch", "synchronized", "this", "throw", "throws", "transient",
+          "try", "void", "volatile", "while");
+
   private static final Map<ProtoType, TypeName> SCALAR_TYPES_MAP =
       ImmutableMap.<ProtoType, TypeName>builder()
           .put(ProtoType.BOOL, TypeName.BOOLEAN.box())
@@ -110,10 +119,69 @@ public final class JavaGenerator {
           .put(ProtoType.UINT64, TypeName.LONG.box())
           .build();
 
+  private static final Map<ProtoType, TypeName> SCALAR_PRIMARY_TYPES_MAP =
+      ImmutableMap.<ProtoType, TypeName>builder()
+          .put(ProtoType.BOOL, TypeName.BOOLEAN)
+          .put(ProtoType.BYTES, ClassName.get(ByteString.class))
+          .put(ProtoType.DOUBLE, TypeName.DOUBLE)
+          .put(ProtoType.FLOAT, TypeName.FLOAT)
+          .put(ProtoType.FIXED32, TypeName.INT)
+          .put(ProtoType.FIXED64, TypeName.LONG)
+          .put(ProtoType.INT32, TypeName.INT)
+          .put(ProtoType.INT64, TypeName.LONG)
+          .put(ProtoType.SFIXED32, TypeName.INT)
+          .put(ProtoType.SFIXED64, TypeName.LONG)
+          .put(ProtoType.SINT32, TypeName.INT)
+          .put(ProtoType.SINT64, TypeName.LONG)
+          .put(ProtoType.STRING, ClassName.get(String.class))
+          .put(ProtoType.UINT32, TypeName.INT)
+          .put(ProtoType.UINT64, TypeName.LONG)
+          .build();
+
+  private static final Map<ProtoType, String> SCALAR_DB_TYPES_MAP =
+          ImmutableMap.<ProtoType, String>builder()
+                  .put(ProtoType.BOOL, "SMALLINT")
+                  .put(ProtoType.BYTES, "BLOB")
+                  .put(ProtoType.DOUBLE, "DOUBLE")
+                  .put(ProtoType.FLOAT, "FLOAT")
+                  .put(ProtoType.FIXED32, "INTEGER")
+                  .put(ProtoType.FIXED64, "INTEGER")
+                  .put(ProtoType.INT32, "INTEGER")
+                  .put(ProtoType.INT64, "INTEGER")
+                  .put(ProtoType.SFIXED32, "INTEGER")
+                  .put(ProtoType.SFIXED64, "INTEGER")
+                  .put(ProtoType.SINT32, "INTEGER")
+                  .put(ProtoType.SINT64, "INTEGER")
+                  .put(ProtoType.STRING, "VARCHAR")
+                  .put(ProtoType.UINT32, "INTEGER")
+                  .put(ProtoType.UINT64, "INTEGER")
+                  .build();
+
+
+  private static final Map<ProtoType, String> SCALAR_TYPE_CHECK_NULL_MAP =
+          ImmutableMap.<ProtoType, String>builder()
+                  .put(ProtoType.BOOL, "DataMapper.getBoolean(%s)")
+                  .put(ProtoType.BYTES, "DataMapper.getByteArray(%s)")
+                  .put(ProtoType.DOUBLE, "DataMapper.getDouble(%s)")
+                  .put(ProtoType.FLOAT, "DataMapper.getDouble(%s)")
+                  .put(ProtoType.FIXED32, "DataMapper.getInt(%s)")
+                  .put(ProtoType.FIXED64, "DataMapper.getInt(%s)")
+                  .put(ProtoType.INT32, "DataMapper.getInt(%s)")
+                  .put(ProtoType.INT64, "DataMapper.getInt(%s)")
+                  .put(ProtoType.SFIXED32, "DataMapper.getInt(%s)")
+                  .put(ProtoType.SFIXED64, "DataMapper.getInt(%s)")
+                  .put(ProtoType.SINT32, "DataMapper.getInt(%s)")
+                  .put(ProtoType.SINT64, "DataMapper.getInt(%s)")
+                  .put(ProtoType.STRING, "DataMapper.getString(%s)")
+                  .put(ProtoType.UINT32, "DataMapper.getInt(%s)")
+                  .put(ProtoType.UINT64, "DataMapper.getInt(%s)")
+                  .build();
+
   private static final String URL_CHARS = "[-!#$%&'()*+,./0-9:;=?@A-Z\\[\\]_a-z~]";
 
   private final Schema schema;
   private final ImmutableMap<ProtoType, TypeName> nameToJavaName;
+  private final ImmutableMap<ProtoType, TypeName> nameToPrimaryJavaName;
   private final ImmutableMap<Field, ProtoFile> extensionFieldToFile;
   private final boolean emitOptions;
   private final ImmutableSet<String> enumOptions;
@@ -128,6 +196,9 @@ public final class JavaGenerator {
     this.emitOptions = emitOptions;
     this.enumOptions = enumOptions;
     this.emitAndroid = emitAndroid;
+    ImmutableMap.Builder<ProtoType, TypeName> nameToPrimaryJavaNameBuilder = ImmutableMap.builder();
+    nameToPrimaryJavaNameBuilder.putAll(SCALAR_PRIMARY_TYPES_MAP);
+    nameToPrimaryJavaName = nameToPrimaryJavaNameBuilder.build();
   }
 
   public JavaGenerator withOptions(boolean emitOptions, Collection<String> enumOptions) {
@@ -404,9 +475,9 @@ public final class JavaGenerator {
         .build());
 
     builder.addField(FieldSpec.builder(TypeName.LONG, nameAllocator.get("serialVersionUID"))
-        .addModifiers(PRIVATE, STATIC, FINAL)
-        .initializer("$LL", 0L)
-        .build());
+            .addModifiers(PRIVATE, STATIC, FINAL)
+            .initializer("$LL", 0L)
+            .build());
 
     if (emitOptions) {
       FieldSpec messageOptions = optionsField(
@@ -504,6 +575,211 @@ public final class JavaGenerator {
     return builder.build();
   }
 
+  /** Returns the generated database code for {@code type}, which may be a top-level or a nested type. */
+  public TypeSpec generateDBMessage(MessageType type) {
+    ClassName javaType = (ClassName) typeName(type.name());
+    NameAllocator nameAllocator = new NameAllocator();
+    nameAllocator.newName("serialVersionUID", "serialVersionUID");
+    nameAllocator.newName("ADAPTER", "ADAPTER");
+    nameAllocator.newName("MESSAGE_OPTIONS", "MESSAGE_OPTIONS");
+    if (emitAndroid) {
+      nameAllocator.newName("CREATOR", "CREATOR");
+    }
+    for (Field field : type.fieldsAndOneOfFields()) {
+      nameAllocator.newName(field.name(), field);
+    }
+    nameAllocator.newName("tagMap", "tagMap");
+    nameAllocator.newName("result", "result");
+    nameAllocator.newName("message", "message");
+    nameAllocator.newName("other", "other");
+    nameAllocator.newName("o", "o");
+
+    TypeSpec.Builder builder = TypeSpec.classBuilder(dbClassName(javaType));
+    builder.addAnnotation(dataTableAnnotation(javaType));
+    builder.addModifiers(PUBLIC);
+
+    if (javaType.enclosingClassName() != null) {
+      builder.addModifiers(STATIC);
+    }
+
+    if (!type.documentation().isEmpty()) {
+      builder.addJavadoc("$L\n", sanitizeJavadoc(type.documentation()));
+    }
+
+    if (emitOptions) {
+      FieldSpec messageOptions = optionsField(MESSAGE_OPTIONS, "MESSAGE_OPTIONS", type.options());
+      if (messageOptions != null) {
+        builder.addField(messageOptions);
+      }
+
+      for (Field field : type.fieldsAndOneOfFields()) {
+        String fieldName = "FIELD_OPTIONS_" + field.name().toUpperCase(Locale.US);
+        FieldSpec fieldOptions = optionsField(FIELD_OPTIONS, fieldName, field.options());
+        if (fieldOptions != null) {
+          builder.addField(fieldOptions);
+        }
+      }
+    }
+    builder.addType(generateColumnInterface(type));
+
+    // add const field
+    for (Field field : type.fieldsAndOneOfFields()) {
+      TypeName fieldType = fieldType(field);
+      TypeName fieldPrimaryType = fieldPrimaryType(field);
+
+//      if ((field.type().isScalar() || isEnum(field.type()))
+//          && !field.isRepeated()
+//          && !field.isPacked()) {
+//        builder.addField(constFiledName(field));
+//      }
+
+      // add filed
+      nameAllocator.get(field);
+      String name = sanitize(field.name());
+      name = normalizeFiledName(name);
+      FieldSpec.Builder fieldBuilder = FieldSpec.builder(fieldPrimaryType, name, PRIVATE);
+      fieldBuilder.addAnnotation(databaseFieldAnnotation(field));
+      if (!field.documentation().isEmpty()) {
+        fieldBuilder.addJavadoc("$L\n", sanitizeJavadoc(field.documentation()));
+      }
+      if (field.isDeprecated()) {
+        fieldBuilder.addAnnotation(Deprecated.class);
+      }
+      builder.addField(fieldBuilder.build());
+    }
+
+    // add method
+    builder.addMethod(dbFieldConstruct());
+    for (Field field : type.fieldsAndOneOfFields()) {
+      builder.addMethod(dbFieldGetter(field));
+      builder.addMethod(dbFieldSetting(field));
+    }
+
+    for (Type nestedType : type.nestedTypes()) {
+      TypeSpec typeSpec = nestedType instanceof MessageType
+          ? generateMessage((MessageType) nestedType)
+          : generateEnum((EnumType) nestedType);
+      builder.addType(typeSpec);
+    }
+
+    // add db statement
+    for (Field field : type.fieldsAndOneOfFields()) {
+      builder.addMethod(dbStatement(javaType, field));
+    }
+
+    builder.addMethod(dbMapper(javaType, type));
+    // add mapper
+
+    return builder.build();
+  }
+
+  /** Returns the generated view model code for {@code type}, which may be a top-level or a nested type. */
+  public TypeSpec generateVMMessage(MessageType type) {
+    ClassName javaType = (ClassName) typeName(type.name());
+    NameAllocator nameAllocator = new NameAllocator();
+    nameAllocator.newName("serialVersionUID", "serialVersionUID");
+    nameAllocator.newName("ADAPTER", "ADAPTER");
+    nameAllocator.newName("MESSAGE_OPTIONS", "MESSAGE_OPTIONS");
+    if (emitAndroid) {
+      nameAllocator.newName("CREATOR", "CREATOR");
+    }
+    for (Field field : type.fieldsAndOneOfFields()) {
+      nameAllocator.newName(field.name(), field);
+    }
+    nameAllocator.newName("tagMap", "tagMap");
+    nameAllocator.newName("result", "result");
+    nameAllocator.newName("message", "message");
+    nameAllocator.newName("other", "other");
+    nameAllocator.newName("o", "o");
+
+    TypeSpec.Builder builder = TypeSpec.classBuilder(vmClassName(javaType));
+    builder.addModifiers(PUBLIC);
+
+    if (javaType.enclosingClassName() != null) {
+      builder.addModifiers(STATIC);
+    }
+
+    if (!type.documentation().isEmpty()) {
+      builder.addJavadoc("$L\n", sanitizeJavadoc(type.documentation()));
+    }
+
+    if (emitOptions) {
+      FieldSpec messageOptions = optionsField(MESSAGE_OPTIONS, "MESSAGE_OPTIONS", type.options());
+      if (messageOptions != null) {
+        builder.addField(messageOptions);
+      }
+
+      for (Field field : type.fieldsAndOneOfFields()) {
+        String fieldName = "FIELD_OPTIONS_" + field.name().toUpperCase(Locale.US);
+        FieldSpec fieldOptions = optionsField(FIELD_OPTIONS, fieldName, field.options());
+        if (fieldOptions != null) {
+          builder.addField(fieldOptions);
+        }
+      }
+    }
+
+    // add const field
+    for (Field field : type.fieldsAndOneOfFields()) {
+      TypeName fieldPrimaryType = fieldPrimaryType(field);
+
+      // add filed
+      nameAllocator.get(field);
+      String name = sanitize(field.name());
+      name = normalizeFiledName(name);
+      FieldSpec.Builder fieldBuilder = FieldSpec.builder(fieldPrimaryType, name, PRIVATE);
+      if (field.isDeprecated()) {
+        fieldBuilder.addAnnotation(Deprecated.class);
+      }
+      builder.addField(fieldBuilder.build());
+    }
+
+    // add method
+    builder.addMethod(dbFieldConstruct());
+    for (Field field : type.fieldsAndOneOfFields()) {
+      builder.addMethod(dbFieldGetter(field));
+      builder.addMethod(dbFieldSetting(field));
+    }
+
+    for (Type nestedType : type.nestedTypes()) {
+      TypeSpec typeSpec = nestedType instanceof MessageType
+              ? generateMessage((MessageType) nestedType)
+              : generateEnum((EnumType) nestedType);
+      builder.addType(typeSpec);
+    }
+
+    return builder.build();
+  }
+
+  public TypeSpec generateColumnInterface(MessageType type) {
+    TypeSpec.Builder builder = TypeSpec.interfaceBuilder("COLUMN")
+            .addModifiers(PUBLIC, STATIC);
+    for (Field field : type.fieldsAndOneOfFields()) {
+
+      if ((field.type().isScalar() || isEnum(field.type()))
+              && !field.isRepeated()
+              && !field.isPacked()) {
+        builder.addField(constFiledName(field));
+      }
+    }
+    return builder.build();
+  }
+
+  public TypeSpec generateDao(MessageType type) {
+    ClassName javaType = (ClassName) typeName(type.name());
+    ClassName daoType = ClassName.bestGuess(daoClassName(javaType));
+    ClassName dbType = ClassName.bestGuess(dbClassName(javaType));
+
+    TypeSpec.Builder builder = TypeSpec.classBuilder(daoType.simpleName())
+            .superclass(ParameterizedTypeName.get(ClassName.get(BaseInfoDao.class),
+                    dbType, daoFakePrimaryKeyType()));
+    builder.addModifiers(PUBLIC);
+    builder.addMethod(daoFieldConstruct(dbType));
+    builder.addMethod(daoGetDbObject(dbType));
+    builder.addMethod(daoGetListDbObject(dbType));
+    builder.addMethod(daoSaveDbObject(dbType));
+    builder.addMethod(daoSaveListDbObject(dbType));
+    return builder.build();
+  }
 
   // Example:
   //
@@ -538,6 +814,11 @@ public final class JavaGenerator {
         .build();
   }
 
+  private TypeName fieldPrimaryType(Field field) {
+    TypeName messageType = nameToPrimaryJavaName.get(field.type());
+    return field.isRepeated() ? listOf(messageType) : messageType;
+  }
+
   private TypeName fieldType(Field field) {
     TypeName messageType = typeName(field.type());
     return field.isRepeated() ? listOf(messageType) : messageType;
@@ -552,6 +833,28 @@ public final class JavaGenerator {
     return FieldSpec.builder(fieldType, defaultFieldName, PUBLIC, STATIC, FINAL)
         .initializer(defaultValue(field))
         .build();
+  }
+  
+  private FieldSpec constFiledName(Field field) {
+    String constFieldName = field.name().toUpperCase(Locale.US);
+    return FieldSpec.builder(ClassName.get(String.class), constFieldName, PUBLIC, STATIC, FINAL)
+        .initializer("$S",normalizeFiledName(field.name()))
+        .build();
+  }
+  
+  private AnnotationSpec dataTableAnnotation(ClassName typeName) {
+    AnnotationSpec.Builder result = AnnotationSpec.builder(DatabaseTable.class);
+    result.addMember("tableName", "$S",dbTableName(typeName));
+    return result.build();
+  }
+
+  private AnnotationSpec databaseFieldAnnotation(Field field) {
+    AnnotationSpec.Builder result = AnnotationSpec.builder(DatabaseField.class);
+    result.addMember("columnName", "COLUMN." + field.name().toUpperCase(Locale.US));
+    if (field.type().toString().equals("bytes")) {
+      result.addMember("dataType","DataType.BYTE_ARRAY");
+    }
+    return result.build();
   }
 
   // Example:
@@ -586,6 +889,189 @@ public final class JavaGenerator {
     }
 
     return result.build();
+  }
+
+  public String normalizeParameterName(final String name) {
+    return Character.toLowerCase(name.charAt(0))+name.substring(1);
+  }
+
+  public String normalizeFiledName(final String name) {
+    String name1 = toCamelCase(name);
+    return Character.toLowerCase(name1.charAt(0))+name1.substring(1);
+  }
+
+  public String toCamelCase(final String init) {
+    if (init == null) return null;
+
+    final StringBuilder ret = new StringBuilder(init.length());
+
+    for (final String word : init.split("_")) {
+      if (!word.isEmpty()) {
+        ret.append(word.substring(0, 1).toUpperCase());
+        ret.append(word.substring(1).toLowerCase());
+      }
+      if (!(ret.length() == init.length())) ret.append("");
+    }
+    return ret.toString();
+  }
+
+  private MethodSpec dbFieldSetting(Field field) {
+    MethodSpec.Builder result = MethodSpec.methodBuilder("set" + toCamelCase(field.name()));
+    result.addModifiers(PUBLIC);
+    result.addParameter(fieldPrimaryType(field), normalizeParameterName(field.name()));
+    result.addStatement("this.$L = $L", normalizeFiledName(field.name()), normalizeParameterName(
+            field.name()));
+    return result.build();
+  }
+
+  private MethodSpec dbFieldGetter(Field field) {
+    MethodSpec.Builder result = MethodSpec.methodBuilder("get" + toCamelCase(field.name()));
+    result.addModifiers(PUBLIC, FINAL);
+    result.returns(fieldPrimaryType(field));
+    result.addStatement("return this.$L", normalizeFiledName(field.name()));
+    return result.build();
+  }
+
+  private MethodSpec daoGetDbObject(ClassName javaType) {
+    MethodSpec.Builder result = MethodSpec.methodBuilder("get");
+    result.addModifiers(PUBLIC);
+    result.addParameter(daoFakePrimaryKeyType(), "id");
+    result.returns(javaType);
+    result.beginControlFlow("try");
+    result.addStatement("final Dao<$L, $L> dao = getDao()", javaType.simpleName(), daoFakePrimaryKeyType());
+    result.addStatement("return dao.queryForId(id)");
+    result.endControlFlow();
+    result.beginControlFlow("catch(Exception e)");
+    result.addStatement("BBAppLogger.e(e)");
+    result.endControlFlow();
+    result.addStatement("return null");
+    return result.build();
+  }
+
+  private MethodSpec daoGetListDbObject(ClassName javaType) {
+    MethodSpec.Builder result = MethodSpec.methodBuilder("getList");
+    result.addModifiers(PUBLIC);
+    result.returns(listOf(javaType));
+    result.addParameter(listOf(daoFakePrimaryKeyType()), "idList");
+    result.beginControlFlow("try");
+    result.addStatement("final Dao<$L, $L> dao = getDao()", javaType.simpleName(), daoFakePrimaryKeyType());
+    result.addStatement("final QueryBuilder<$L, $L> builder = dao.queryBuilder()", javaType.simpleName(), daoFakePrimaryKeyType());
+    result.addStatement("builder.where().in($L.COLUMN.PRIMARY_KEY, idList)", javaType.simpleName());
+    result.endControlFlow();
+    result.beginControlFlow("catch(Exception e)");
+    result.addStatement("BBAppLogger.e(e)");
+    result.endControlFlow();
+    result.addStatement("return new ArrayList<>();");
+    return result.build();
+  }
+  private MethodSpec daoSaveDbObject(ClassName javaType) {
+    MethodSpec.Builder result = MethodSpec.methodBuilder("save");
+    result.addModifiers(PUBLIC);
+
+    /*
+    *Dao($L, $L dao = getDao;
+     */
+    result.addParameter(javaType, "dbObject", FINAL);
+    result.beginControlFlow("try");
+    result.addStatement("final Dao<$L, $L> dao = getDao()", javaType.simpleName(), daoFakePrimaryKeyType());
+    result.addStatement("dao.createOrUpdate(dbObject);");
+    result.endControlFlow();
+    result.beginControlFlow("catch(Exception e)");
+    result.addStatement("BBAppLogger.e(e)");
+    result.endControlFlow();
+    return result.build();
+  }
+  private MethodSpec daoSaveListDbObject(ClassName javaType) {
+    MethodSpec.Builder result = MethodSpec.methodBuilder("save");
+    result.addModifiers(PUBLIC);
+    result.addParameter(listOf(javaType), "dbObjects", FINAL);
+    result.beginControlFlow("if ( dbObjects.size() <= 0)");
+    result.addStatement("return");
+    result.endControlFlow();
+    result.beginControlFlow("try");
+    result.addStatement("final Dao<$L, $L> dao = getDao()", javaType.simpleName(), daoFakePrimaryKeyType());
+    result.beginControlFlow("dao.callBatchTasks(new Callable<Object>() {\n\t@Override\n\t" +
+            "public Object call() throws Exception ");
+    result.beginControlFlow("\tfor ($L dbObject : dbObjects) ", javaType);
+    result.addStatement("\tdao.createOrUpdate(dbObject)");
+    result.endControlFlow();
+    result.addStatement("\treturn null");
+    result.endControlFlow();
+    result.endControlFlow(")");
+    result.beginControlFlow("} catch(Exception e)");
+    result.addStatement("BBAppLogger.e(e)");
+    result.endControlFlow();
+    return result.build();
+  }
+
+  private String vmClassName(ClassName javaType) {
+    return "VM" + javaType.simpleName();
+  }
+
+  private String dbClassName(ClassName javaType) {
+    return "DB" + javaType.simpleName();
+  }
+
+  private String daoClassName(ClassName javaType) {
+    return javaType.simpleName()+"Dao";
+  }
+
+  private MethodSpec dbStatement(ClassName javaType, Field field) {
+    MethodSpec.Builder result = MethodSpec.methodBuilder("create" + normalizeFiledName(field.name()));
+    result.addModifiers(PUBLIC,STATIC);
+    result.returns(ClassName.get(String.class));
+
+    result.addStatement("return \"alter table $L ADD $L $L;\"", dbTableName(javaType), normalizeFiledName(field.name()), dbTypeName(field));
+    return result.build();
+  }
+
+  private MethodSpec dbMapper(ClassName javaType,  MessageType type) {
+    MethodSpec.Builder result = MethodSpec.methodBuilder("map");
+    result.addModifiers(PUBLIC, STATIC);
+    result.addParameter(javaType, "protoObject");
+    ClassName className = ClassName.get("", dbClassName(javaType));
+    result.addParameter(className, "dbObject");
+    for (Field field : type.fieldsAndOneOfFields()) {
+      result.addStatement("dbObject.set$L($L)", toCamelCase(field.name()), getCheckNullField(field));
+    }
+
+    return result.build();
+  }
+
+  private static String sanitize(String name) {
+    return JAVA_KEYWORDS.contains(name) ? "_" + name : name;
+  }
+
+
+  private String getCheckNullField(Field field) {
+    return String.format(SCALAR_TYPE_CHECK_NULL_MAP.get(field.type()), field.name());
+  }
+
+  private String dbTypeName(Field field) {
+    return SCALAR_DB_TYPES_MAP.get(field.type());
+  }
+
+  private String dbTableName(ClassName typeName) {
+    return "sp_"+typeName.simpleName();
+  }
+
+  private MethodSpec dbFieldConstruct() {
+    MethodSpec.Builder result = MethodSpec.constructorBuilder();
+    result.addModifiers(PUBLIC);
+    return result.build();
+  }
+
+  private MethodSpec daoFieldConstruct(ClassName javaType) {
+    MethodSpec.Builder result = MethodSpec.constructorBuilder();
+    result.addModifiers(PUBLIC);
+    ClassName dataBaseHelper = ClassName.bestGuess("DatabaseHelper");
+    result.addParameter(dataBaseHelper, "helper");
+    result.addStatement("super(helper, $L.class)", javaType.simpleName());
+    return result.build();
+  }
+
+  private TypeName daoFakePrimaryKeyType() {
+    return ClassName.get(Object.class);
   }
 
   private String adapterString(ProtoType type) {

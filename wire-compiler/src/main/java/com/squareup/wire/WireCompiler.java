@@ -95,8 +95,24 @@ public final class WireCompiler {
       for (Type type : protoFile.types()) {
         ClassName javaTypeName = (ClassName) javaGenerator.typeName(type.name());
         TypeSpec typeSpec = type instanceof MessageType
-            ? javaGenerator.generateMessage((MessageType) type)
+            ? javaGenerator.generateDBMessage((MessageType) type)
             : javaGenerator.generateEnum((EnumType) type);
+        writeJavaFile(javaTypeName, typeSpec, type.location());
+      }
+
+      for (Type type : protoFile.types()) {
+        ClassName javaTypeName = (ClassName) javaGenerator.typeName(type.name());
+        TypeSpec typeSpec = type instanceof MessageType
+                ? javaGenerator.generateDao((MessageType) type)
+                : javaGenerator.generateEnum((EnumType) type);
+        writeJavaFile(javaTypeName, typeSpec, type.location());
+      }
+
+      for (Type type : protoFile.types()) {
+        ClassName javaTypeName = (ClassName) javaGenerator.typeName(type.name());
+        TypeSpec typeSpec = type instanceof MessageType
+                ? javaGenerator.generateVMMessage((MessageType) type)
+                : javaGenerator.generateEnum((EnumType) type);
         writeJavaFile(javaTypeName, typeSpec, type.location());
       }
 
