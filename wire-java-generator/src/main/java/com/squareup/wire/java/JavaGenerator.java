@@ -1032,7 +1032,7 @@ public final class JavaGenerator {
     ClassName className = ClassName.get("", dbClassName(javaType));
     result.addParameter(className, "dbObject");
     for (Field field : type.fieldsAndOneOfFields()) {
-      result.addStatement("dbObject.set$L($L)", toCamelCase(field.name()), getCheckNullField(field));
+      result.addStatement("dbObject.set$L($L)", toCamelCase(field.name()), getCheckNullField("protoObject",field));
     }
 
     return result.build();
@@ -1043,8 +1043,8 @@ public final class JavaGenerator {
   }
 
 
-  private String getCheckNullField(Field field) {
-    return String.format(SCALAR_TYPE_CHECK_NULL_MAP.get(field.type()), field.name());
+  private String getCheckNullField(String sourceParamName, Field field) {
+    return String.format(SCALAR_TYPE_CHECK_NULL_MAP.get(field.type()), sourceParamName+"."+field.name());
   }
 
   private String dbTypeName(Field field) {
