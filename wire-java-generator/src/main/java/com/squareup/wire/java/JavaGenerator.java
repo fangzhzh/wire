@@ -746,6 +746,7 @@ public final class JavaGenerator {
               : generateEnum((EnumType) nestedType);
       builder.addType(typeSpec);
     }
+    builder.addMethod(vmMapper(javaType, type));
 
     return builder.build();
   }
@@ -920,7 +921,7 @@ public final class JavaGenerator {
     result.addModifiers(PUBLIC);
     result.addParameter(fieldPrimaryType(field), normalizeParameterName(field.name()));
     result.addStatement("this.$L = $L", normalizeFiledName(field.name()), normalizeParameterName(
-            field.name()));
+        field.name()));
     return result.build();
   }
 
@@ -1018,7 +1019,7 @@ public final class JavaGenerator {
 
   private MethodSpec dbStatement(ClassName javaType, Field field) {
     MethodSpec.Builder result = MethodSpec.methodBuilder("create" + normalizeFiledName(field.name()));
-    result.addModifiers(PUBLIC,STATIC);
+    result.addModifiers(PUBLIC, STATIC);
     result.returns(ClassName.get(String.class));
 
     result.addStatement("return \"alter table $L ADD $L $L;\"", dbTableName(javaType), normalizeFiledName(field.name()), dbTypeName(field));
@@ -1028,7 +1029,7 @@ public final class JavaGenerator {
   private MethodSpec dbMapper(ClassName javaType,  MessageType type) {
     MethodSpec.Builder result = MethodSpec.methodBuilder("map");
     result.addModifiers(PUBLIC, STATIC);
-    result.addParameter(javaType, "protoObject");
+    result.addParameter(javaType, "protoObject", FINAL);
     ClassName className = ClassName.get("", dbClassName(javaType));
     result.addParameter(className, "dbObject");
     for (Field field : type.fieldsAndOneOfFields()) {
@@ -1036,6 +1037,21 @@ public final class JavaGenerator {
     }
 
     return result.build();
+  }
+
+  private MethodSpec vmMapper(ClassName javaType, MessageType type) {
+    MethodSpec.Builder result = MethodSpec.methodBuilder("map");
+    result.addModifiers(PUBLIC, STATIC);
+    ClassName dbClassName = ClassName.get("", dbClassName(javaType));
+    result.addParameter(dbClassName, "dbObject", FINAL);
+    ClassName className = ClassName.get("", vmClassName(javaType));
+    result.addParameter(className, "vmObject");
+    for (Field field : type.fieldsAndOneOfFields()) {
+      result.addStatement("vmObject.set$L($L.get$L())", toCamelCase(field.name()), "dbObject",toCamelCase(field.name()));
+    }
+
+    return result.build();
+
   }
 
   private static String sanitize(String name) {
