@@ -165,16 +165,16 @@ public final class JavaGenerator {
                   .put(ProtoType.DOUBLE, "DataMapper.getDouble(%s)")
                   .put(ProtoType.FLOAT, "DataMapper.getDouble(%s)")
                   .put(ProtoType.FIXED32, "DataMapper.getInt(%s)")
-                  .put(ProtoType.FIXED64, "DataMapper.getInt(%s)")
+                  .put(ProtoType.FIXED64, "DataMapper.getLong(%s)")
                   .put(ProtoType.INT32, "DataMapper.getInt(%s)")
-                  .put(ProtoType.INT64, "DataMapper.getInt(%s)")
+                  .put(ProtoType.INT64, "DataMapper.getLong(%s)")
                   .put(ProtoType.SFIXED32, "DataMapper.getInt(%s)")
-                  .put(ProtoType.SFIXED64, "DataMapper.getInt(%s)")
+                  .put(ProtoType.SFIXED64, "DataMapper.getLong(%s)")
                   .put(ProtoType.SINT32, "DataMapper.getInt(%s)")
-                  .put(ProtoType.SINT64, "DataMapper.getInt(%s)")
+                  .put(ProtoType.SINT64, "DataMapper.getLong(%s)")
                   .put(ProtoType.STRING, "DataMapper.getString(%s)")
                   .put(ProtoType.UINT32, "DataMapper.getInt(%s)")
-                  .put(ProtoType.UINT64, "DataMapper.getInt(%s)")
+                  .put(ProtoType.UINT64, "DataMapper.getLong(%s)")
                   .build();
 
   private static final String URL_CHARS = "[-!#$%&'()*+,./0-9:;=?@A-Z\\[\\]_a-z~]";
