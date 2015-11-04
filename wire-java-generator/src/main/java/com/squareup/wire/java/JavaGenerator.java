@@ -1018,7 +1018,7 @@ public final class JavaGenerator {
   }
 
   private MethodSpec dbStatement(ClassName javaType, Field field) {
-    MethodSpec.Builder result = MethodSpec.methodBuilder("create" + normalizeFiledName(field.name()));
+    MethodSpec.Builder result = MethodSpec.methodBuilder("create" + toCamelCase(field.name()));
     result.addModifiers(PUBLIC, STATIC);
     result.returns(ClassName.get(String.class));
 
