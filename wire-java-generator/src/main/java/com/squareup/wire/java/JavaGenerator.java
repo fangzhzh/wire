@@ -958,11 +958,12 @@ public final class JavaGenerator {
     result.addStatement("final Dao<$L, $L> dao = getDao()", javaType.simpleName(), daoFakePrimaryKeyType());
     result.addStatement("final QueryBuilder<$L, $L> builder = dao.queryBuilder()", javaType.simpleName(), daoFakePrimaryKeyType());
     result.addStatement("builder.where().in($L.COLUMN.PRIMARY_KEY, idList)", javaType.simpleName());
+    result.addStatement("return builder.query()");
     result.endControlFlow();
     result.beginControlFlow("catch(Exception e)");
     result.addStatement("BBAppLogger.e(e)");
     result.endControlFlow();
-    result.addStatement("return new ArrayList<>();");
+    result.addStatement("return new ArrayList<>()");
     return result.build();
   }
   private MethodSpec daoSaveDbObject(ClassName javaType) {
@@ -975,7 +976,7 @@ public final class JavaGenerator {
     result.addParameter(javaType, "dbObject", FINAL);
     result.beginControlFlow("try");
     result.addStatement("final Dao<$L, $L> dao = getDao()", javaType.simpleName(), daoFakePrimaryKeyType());
-    result.addStatement("dao.createOrUpdate(dbObject);");
+    result.addStatement("dao.createOrUpdate(dbObject)");
     result.endControlFlow();
     result.beginControlFlow("catch(Exception e)");
     result.addStatement("BBAppLogger.e(e)");
