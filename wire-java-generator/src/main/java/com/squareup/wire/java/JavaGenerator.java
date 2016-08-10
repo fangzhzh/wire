@@ -765,6 +765,20 @@ public final class JavaGenerator {
     return builder.build();
   }
 
+  public TypeSpec generateStore(MessageType type){
+    ClassName javaType = (ClassName) typeName(type.name());
+    ClassName storeType = ClassName.bestGuess(storeClassName(javaType));
+    ClassName daoType = ClassName.bestGuess(daoClassName(javaType));
+    TypeSpec.Builder builder = TypeSpec.classBuilder(storeType.simpleName());
+    builder.addModifiers(PUBLIC);
+    builder.addField(FieldSpec.builder(daoType, normalizeParameterName(daoType.simpleName()))
+            .addModifiers(PRIVATE)
+            .initializer("$L$L$L", "SPDatabaseManager.getInstance().get", daoType, "()")
+            .build());
+    builder.addMethod(storeConstruct());
+    return builder.build();
+  }
+
   public TypeSpec generateDao(MessageType type) {
     ClassName javaType = (ClassName) typeName(type.name());
     ClassName daoType = ClassName.bestGuess(daoClassName(javaType));
@@ -774,6 +788,22 @@ public final class JavaGenerator {
             .superclass(ParameterizedTypeName.get(ClassName.get(BaseInfoDao.class),
                     dbType, daoFakePrimaryKeyType()));
     builder.addModifiers(PUBLIC);
+    builder.addJavadoc("\n @see SPDatabaseManager\n" +
+            " TODO:         private static final String $L = \"$L\";\n\n" +
+            " TODO:         registerDao($L, new $L(mDBHelper));\n" +
+            " TODO:        \n" +
+            "     public $L get$L() {\n" +
+            "        return ($L)getDaoMap().get($L);\n" +
+            "    };\n",
+            daoType.simpleName(),
+            daoType.simpleName(),
+            daoType.simpleName(),
+            daoType.simpleName(),
+            daoType.simpleName(),
+            daoType.simpleName(),
+            daoType.simpleName(),
+            daoType.simpleName()
+            );
     builder.addMethod(daoFieldConstruct(dbType));
     builder.addMethod(daoGetDbObject(dbType));
     builder.addMethod(daoGetListDbObject(dbType));
@@ -1014,6 +1044,9 @@ public final class JavaGenerator {
     return "DB" + javaType.simpleName();
   }
 
+  private String storeClassName(ClassName javaType){
+      return javaType.simpleName()+"Store";
+  }
   private String daoClassName(ClassName javaType) {
     return javaType.simpleName()+"Dao";
   }
@@ -1078,6 +1111,13 @@ public final class JavaGenerator {
     return result.build();
   }
 
+  private MethodSpec storeConstruct() {
+    MethodSpec.Builder builder = MethodSpec.constructorBuilder();
+    builder.addModifiers(PUBLIC);
+    builder.addAnnotation(Inject.class);
+    return builder.build();
+
+  }
   private MethodSpec daoFieldConstruct(ClassName javaType) {
     MethodSpec.Builder result = MethodSpec.constructorBuilder();
     result.addModifiers(PUBLIC);

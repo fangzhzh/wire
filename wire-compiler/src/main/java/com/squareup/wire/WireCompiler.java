@@ -116,6 +116,14 @@ public final class WireCompiler {
         writeJavaFile(javaTypeName, typeSpec, type.location());
       }
 
+      for (Type type : protoFile.types()) {
+        ClassName javaTypeName = (ClassName) javaGenerator.typeName(type.name());
+        TypeSpec typeSpec = type instanceof MessageType
+                ? javaGenerator.generateStore((MessageType) type)
+                : javaGenerator.generateEnum((EnumType) type);
+        writeJavaFile(javaTypeName, typeSpec, type.location());
+      }
+
       if (!protoFile.extendList().isEmpty()) {
         ClassName javaTypeName = javaGenerator.extensionsClass(protoFile);
         TypeSpec typeSpec = javaGenerator.generateExtensionsClass(javaTypeName, protoFile);
