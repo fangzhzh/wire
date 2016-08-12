@@ -794,7 +794,8 @@ public final class JavaGenerator {
             " TODO:        \n" +
             "     public $L get$L() {\n" +
             "        return ($L)getDaoMap().get($L);\n" +
-            "    };\n",
+            "    };\n" +
+            "TODO: replace Object to primary key\n" ,
             daoType.simpleName(),
             daoType.simpleName(),
             daoType.simpleName(),
