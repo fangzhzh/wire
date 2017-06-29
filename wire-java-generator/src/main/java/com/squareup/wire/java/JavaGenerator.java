@@ -667,7 +667,7 @@ public final class JavaGenerator {
       builder.addMethod(dbStatement(javaType, field));
     }
 
-    builder.addMethod(dbMapper(javaType, type));
+    // builder.addMethod(dbMapper(javaType, type));
     // add mapper
 
     return builder.build();
@@ -848,6 +848,9 @@ public final class JavaGenerator {
 
   private TypeName fieldPrimaryType(Field field) {
     TypeName messageType = nameToPrimaryJavaName.get(field.type());
+    if( messageType == null) {
+        return fieldType(field);
+    }
     return field.isRepeated() ? listOf(messageType) : messageType;
   }
 

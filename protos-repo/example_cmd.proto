@@ -1,0 +1,14 @@
+option java_package = "com.android.test";
+
+message CallLog {
+  required int32 call_seq_id = 1;
+
+    // feedback: string
+  optional string feedback = 2;
+  enum CallDirection {
+    CD_UNKNOWN = 0;
+    IN = 1;
+    OUT = 2;
+  }
+  optional CallDirection call_direction = 3 [default = CD_UNKNOWN];
+}
